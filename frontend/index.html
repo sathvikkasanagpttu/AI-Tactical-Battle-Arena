@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Tactical Battle Arena</title>
+<style>
+:root{--bg:#080b12;--panel:#101621;--panel2:#151c29;--line:#263247;--text:#edf3ff;--muted:#8e9bb1;--accent:#63e6be;--danger:#ff6b7a;--gold:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#172235,#080b12 50%);color:var(--text);font:14px Inter,system-ui,Arial,sans-serif}
+.app{max-width:1450px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:18px}.brand h1{margin:0;font-size:25px}.brand p{margin:5px 0;color:var(--muted)}button{border:1px solid var(--line);background:#172131;color:var(--text);padding:11px 15px;border-radius:10px;cursor:pointer;font-weight:700}button:hover{border-color:var(--accent)}.layout{display:grid;grid-template-columns:250px minmax(450px,1fr) 310px;gap:16px}.panel{background:rgba(16,22,33,.92);border:1px solid var(--line);border-radius:16px;padding:16px}.panel h2,.panel h3{margin:0 0 12px}.unit{padding:11px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;cursor:pointer}.unit.selected{border-color:var(--accent);background:#112a29}.bar{height:6px;background:#263040;border-radius:5px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;background:var(--accent)}.battle{background:#0c111a;border:1px solid var(--line);border-radius:16px;padding:16px}.grid{display:grid;grid-template-columns:repeat(10,1fr);gap:5px;max-width:720px;margin:auto}.cell{aspect-ratio:1;border-radius:7px;border:1px solid #202b3d;background:#121a27;display:flex;align-items:center;justify-content:center;font-size:20px;position:relative;cursor:pointer}.cell:hover{border-color:var(--accent)}.cell.obstacle{background:#252d38}.cell .hp{position:absolute;bottom:3px;left:12%;width:76%;height:3px;background:#2b3442}.cell .hp i{display:block;height:100%;background:var(--accent)}.ai{border-color:#7f2f42}.status{padding:12px;border-radius:11px;background:var(--panel2);margin-bottom:10px}.metric{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #202a3a}.muted{color:var(--muted)}.danger{color:var(--danger)}.gold{color:var(--gold)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.feed{max-height:190px;overflow:auto;font-size:13px;line-height:1.5}.footer{margin-top:16px;color:var(--muted);text-align:center;font-size:12px}@media(max-width:1050px){.layout{grid-template-columns:1fr 1fr}.battle{grid-column:1/-1}.grid{max-width:680px}}@media(max-width:700px){.app{padding:12px}.layout{grid-template-columns:1fr}.battle{grid-column:auto}.top{align-items:flex-start}.grid{gap:3px}.cell{font-size:16px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><div class="brand"><h1>⚔️ AI Tactical Battle Arena</h1><p>Explainable AI • A* Pathfinding • Tactical Combat Analytics</p></div><button id="restart">↻ New Battle</button></header>
+<div class="layout">
+<section class="panel"><h2>Your Squad</h2><div id="squad"></div><div class="status"><div class="metric"><span>Turn</span><b id="turn">1</b></div><div class="metric"><span>Phase</span><b id="phase">PLAYER</b></div><div class="metric"><span>Result</span><b id="result">—</b></div></div></section>
+<main class="battle"><div id="grid" class="grid"></div><div class="actions"><button id="attack">⚔ Attack Selected Target</button><button id="heal">✚ Heal Ally</button><button id="move">➜ Move Selected</button></div><p class="muted">Select a friendly unit, then select an enemy to attack. For movement, select a destination tile.</p></main>
+<aside class="panel"><h2>🤖 AI Command Center</h2><div class="status"><b>Current Intelligence</b><p id="aiText" class="muted">Waiting for player action.</p></div><div class="metric"><span>Threat</span><b class="danger">HIGH</b></div><div class="metric"><span>Decision Model</span><b>TACTICAL</b></div><div class="metric"><span>Pathfinding</span><b>A*</b></div><h3 style="margin-top:18px">Event Feed</h3><div id="feed" class="feed muted"></div></aside>
+</div>
+<div class="footer">AI Tactical Battle Arena • Portfolio Engineering Project • FastAPI + Python + SQLite</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);let state=null,selected=null,target=null,moveMode=false;
+async function api(url,opt){const r=await fetch(url,opt);if(!r.ok){const e=await r.json().catch(()=>({detail:"Request failed"}));alert(e.detail||"Request failed");throw 0}return r.json()}
+function render(s){state=s; $("turn").textContent=s.game.turn;$("phase").textContent=s.game.phase;$("result").textContent=s.game.winner||"—";$("aiText").textContent=s.game.last_ai;
+const squad=$("squad");squad.innerHTML="";s.units.filter(u=>u.team==="PLAYER").forEach(u=>{const d=document.createElement("div");d.className="unit"+(selected===u.id?" selected":"");d.innerHTML=`<b>${u.type}</b><div class="muted">${u.id} • HP ${u.hp}/${u.max_hp}</div><div class="bar"><i style="width:${u.hp/u.max_hp*100}%"></i></div>`;d.onclick=()=>{selected=u.id;target=null;moveMode=false;render(s)};squad.appendChild(d)});
+const grid=$("grid");grid.innerHTML="";for(let y=0;y<10;y++)for(let x=0;x<10;x++){const c=document.createElement("div");c.className="cell";const o=s.obstacles.some(p=>p.x===x&&p.y===y);if(o)c.classList.add("obstacle"),c.textContent="▦";const u=s.units.find(z=>z.x===x&&z.y===y&&z.hp>0);if(u){c.classList.add(u.team==="AI"?"ai":"");c.textContent=u.team==="AI"?"🔴":({Assault:"🟢",Sniper:"🎯",Medic:"✚",Scout:"👁"}[u.type]);c.title=`${u.type} ${u.hp}/${u.max_hp}`;const hp=document.createElement("span");hp.className="hp";hp.innerHTML=`<i style="width:${u.hp/u.max_hp*100}%"></i>`;c.appendChild(hp);c.onclick=()=>{if(u.team==="AI"){target=u.id;render(s)}else{selected=u.id;target=null;render(s)}}}else c.onclick=()=>{if(selected&&moveMode)doAction("MOVE",null,x,y)};grid.appendChild(c)}
+}
+async function doAction(action,target_id=null,x=null,y=null){moveMode=false;const r=await api("/api/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({unit_id:selected,action,target_id,x,y})});render(r);await loadFeed()}
+$("attack").onclick=()=>{if(selected&&target)doAction("ATTACK",target);else alert("Select your unit and an enemy target.")};
+$("heal").onclick=()=>{if(selected&&target)doAction("HEAL",target);else alert("Select a Medic, then a friendly unit.")};
+$("move").onclick=()=>{if(selected){moveMode=true;alert("Click an empty battlefield tile to move.");}else alert("Select a unit first.")};
+$("restart").onclick=async()=>render(await api("/api/game/restart",{method:"POST"}));
+async function loadFeed(){const h=await api("/api/history");$("feed").innerHTML=h.matches.map(m=>`Match #${m.id} — <b>${m.result}</b> — ${m.turns||0} turns`).join("<br>")}
+(async()=>{render(await api("/api/game"));loadFeed()})();
+</script>
+</body>
+</html>
